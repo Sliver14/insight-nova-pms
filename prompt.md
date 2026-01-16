@@ -1,1 +1,2 @@
 observe frontend ui, create/update schema, sync with backend, create relevant api, lets start with sqlite, create seed data, accomplish phase 0 and phase 1, reference structureGuide.md and insightnova pms requiements md
+

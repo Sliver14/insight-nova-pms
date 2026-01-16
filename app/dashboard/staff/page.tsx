@@ -1,213 +1,198 @@
 "use client";
 
-import { StaffCard } from "@/components/dashboard/StaffCard";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useUser } from "../../../components/providers/userProvider";
+import { useState, useMemo } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { Check, Copy, Search, UserCheck, UserX } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Search, Plus, Clock, CreditCard, Calendar } from "lucide-react";
-import { useState } from "react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
-
-interface StaffMember {
-  id: string;
-  name: string;
-  role: string;
-  email: string;
-  phone: string;
-  avatar?: string;
-  revenue: number;
-  performance: "excellent" | "good" | "average" | "poor";
-  checkIns: number;
-  checkOuts: number;
-  transactions: number;
-  shiftStart: string;
-  shiftEnd: string;
-  status: "active" | "on-break" | "off-duty";
-}
-
-const staffMembers: StaffMember[] = [
-  { id: "1", name: "Adamu Bello", role: "Front Desk Manager", email: "adamu@hotel.com", phone: "+234 801 234 5678", revenue: 2800000, performance: "excellent", checkIns: 45, checkOuts: 38, transactions: 124, shiftStart: "06:00", shiftEnd: "14:00", status: "active" },
-  { id: "2", name: "Chioma Eze", role: "Senior Receptionist", email: "chioma@hotel.com", phone: "+234 802 345 6789", revenue: 2400000, performance: "excellent", checkIns: 42, checkOuts: 35, transactions: 98, shiftStart: "06:00", shiftEnd: "14:00", status: "active" },
-  { id: "3", name: "Emeka Okonkwo", role: "Night Auditor", email: "emeka@hotel.com", phone: "+234 803 456 7890", revenue: 2100000, performance: "good", checkIns: 28, checkOuts: 45, transactions: 87, shiftStart: "22:00", shiftEnd: "06:00", status: "off-duty" },
-  { id: "4", name: "Fatima Abdullahi", role: "Receptionist", email: "fatima@hotel.com", phone: "+234 804 567 8901", revenue: 1800000, performance: "good", checkIns: 35, checkOuts: 30, transactions: 76, shiftStart: "14:00", shiftEnd: "22:00", status: "on-break" },
-  { id: "5", name: "Ibrahim Musa", role: "Reservations Agent", email: "ibrahim@hotel.com", phone: "+234 805 678 9012", revenue: 1500000, performance: "average", checkIns: 22, checkOuts: 18, transactions: 54, shiftStart: "14:00", shiftEnd: "22:00", status: "active" },
-];
-
-const weeklyData = [
-  { day: "Mon", revenue: 450000 },
-  { day: "Tue", revenue: 380000 },
-  { day: "Wed", revenue: 520000 },
-  { day: "Thu", revenue: 470000 },
-  { day: "Fri", revenue: 620000 },
-  { day: "Sat", revenue: 780000 },
-  { day: "Sun", revenue: 560000 },
-];
-
-const statusConfig = {
-  active: { color: "bg-success/20 text-success border-success/30", label: "Active" },
-  "on-break": { color: "bg-secondary/20 text-secondary border-secondary/30", label: "On Break" },
-  "off-duty": { color: "bg-muted text-muted-foreground border-border", label: "Off Duty" },
-};
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
 
 export default function Staff() {
-  const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [copied, setCopied] = useState(false);
+  const { toast } = useToast();
+  const { user } = useUser();
+  const queryClient = useQueryClient();
 
-  const filteredStaff = staffMembers.filter((staff) =>
-    staff.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    staff.role.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // ... (useQuery and useMutation logic remains the same)
+  const { data: staff = [], isLoading, isError } = useQuery({
+    queryKey: ["staff"],
+    queryFn: async () => {
+      const res = await fetch("/api/staff");
+      if (!res.ok) throw new Error("Failed to fetch staff");
+      return res.json();
+    },
+  });
+
+  const approvalMutation = useMutation({
+    mutationFn: async ({ staffId, isApproved }: { staffId: string; isApproved: boolean }) => {
+      const res = await fetch("/api/staff", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ staffId, isApproved }),
+      });
+      if (!res.ok) throw new Error("Failed to update staff status");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["staff"] });
+      toast({ title: "Success", description: "Staff status updated successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to update status", variant: "destructive" });
+    },
+  });
+
+  const copySignupUrl = () => {
+    if (!user?.hotelId) {
+      toast({ title: "Error", description: "No hotel ID found", variant: "destructive" });
+      return;
+    }
+    const baseUrl = window.location.origin;
+    const signupUrl = `${baseUrl}/auth/staff-signup?hotelId=${user.hotelId}`;
+    navigator.clipboard.writeText(signupUrl);
+    setCopied(true);
+    toast({ title: "Copied!", description: "Staff signup URL copied" });
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const filteredStaff = useMemo(() => {
+    if (!searchQuery) return staff;
+    const lower = searchQuery.toLowerCase();
+    return staff.filter((member: any) =>
+      (member.fullname?.toLowerCase() || "").includes(lower) ||
+      (member.email?.toLowerCase() || "").includes(lower) ||
+      (member.role?.toLowerCase() || "").includes(lower)
+    );
+  }, [searchQuery, staff]);
+
+  const totalStaff = staff.length;
+  const activeStaff = staff.filter((s: any) => s.is_approved).length;
+  const pendingStaff = totalStaff - activeStaff;
+
+  const getRoleBadge = (role: string) => {
+    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+      ADMIN: "destructive", MANAGER: "default", STAFF: "secondary", FRONTDESK: "outline", CLEANER: "outline",
+    };
+    return variants[role?.toUpperCase()] || "outline";
+  };
+
+  if (isLoading) return <div className="space-y-8 p-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-64 w-full" /></div>;
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div className="space-y-6 md:space-y-8 pb-10 overflow-x-hidden">
+      {/* Header - Stacks on mobile */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Staff Management</h1>
-          <p className="text-muted-foreground">Monitor performance and manage team</p>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Staff Management</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Manage hotel staff and roles</p>
         </div>
-        <Button variant="hero">
-          <Plus className="h-4 w-4 mr-2" />
-          Add Staff Member
+        <Button variant="hero" onClick={copySignupUrl} className="w-full sm:w-auto">
+          {copied ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
+          {copied ? "Copied!" : "Signup Link"}
         </Button>
       </div>
 
+      {/* Stats - 3 columns on desktop, 1 on mobile */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+        {[
+          { label: "Total Staff", val: totalStaff, color: "" },
+          { label: "Active", val: activeStaff, color: "text-primary" },
+          { label: "Pending", val: pendingStaff, color: "text-orange-500" }
+        ].map((stat, i) => (
+          <div key={i} className="glass-card p-4 flex flex-row sm:flex-col justify-between items-center sm:text-center">
+            <p className="text-xs md:text-sm text-muted-foreground uppercase font-medium">{stat.label}</p>
+            <p className={`text-xl md:text-2xl font-bold ${stat.color}`}>{stat.val}</p>
+          </div>
+        ))}
+      </div>
+
       {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      <div className="relative w-full max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search staff by name or role..."
-          className="pl-10"
+          placeholder="Search staff..."
+          className="pl-9"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
       </div>
 
-      {/* Active Staff Count */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {Object.entries(statusConfig).map(([status, config]) => {
-          const count = staffMembers.filter((s) => s.status === status).length;
-          return (
-            <div key={status} className="glass-card p-4 flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-bold">{count}</p>
-                <p className="text-sm text-muted-foreground capitalize">{status.replace("-", " ")}</p>
-              </div>
-              <Badge variant="outline" className={config.color}>
-                {config.label}
-              </Badge>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Staff List */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {filteredStaff.map((staff) => (
-          <div key={staff.id} onClick={() => setSelectedStaff(staff)} className="cursor-pointer">
-            <StaffCard staff={staff} />
-            <div className="flex items-center justify-between px-4 py-2 bg-muted/30 rounded-b-xl -mt-2 border-x border-b border-glass-border">
-              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  {staff.shiftStart} - {staff.shiftEnd}
-                </span>
-              </div>
-              <Badge variant="outline" className={statusConfig[staff.status].color}>
-                {statusConfig[staff.status].label}
-              </Badge>
-            </div>
+      {/* Staff Table Container - This handles the horizontal scroll */}
+      <div className="glass-card border rounded-xl overflow-hidden">
+        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-200">
+          <div className="inline-block min-w-full align-middle">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="min-w-[150px]">Name & Email</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="hidden lg:table-cell">Joined</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredStaff.map((member: any) => (
+                  <TableRow key={member.id} className="hover:bg-muted/30 transition-colors">
+                    <TableCell>
+                      <div className="font-semibold text-sm md:text-base">{member.fullname}</div>
+                      <div className="text-xs text-muted-foreground truncate max-w-[120px] md:max-w-none">
+                        {member.email}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getRoleBadge(member.role)} className="text-[10px] md:text-xs uppercase">
+                        {member.role}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={member.is_approved ? "default" : "outline"} className="text-[10px]">
+                        {member.is_approved ? "Active" : "Pending"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
+                      {format(new Date(member.created_at), "MMM dd, yy")}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {!member.is_approved ? (
+                        <div className="flex gap-1 justify-end">
+                          <Button 
+                            size="icon" 
+                            variant="ghost" 
+                            className="h-8 w-8 text-primary"
+                            onClick={() => approvalMutation.mutate({ staffId: member.id, isApproved: true })}
+                          >
+                            <UserCheck className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            size="icon" 
+                            variant="ghost" 
+                            className="h-8 w-8 text-destructive"
+                            onClick={() => approvalMutation.mutate({ staffId: member.id, isApproved: false })}
+                          >
+                            <UserX className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Approved</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {filteredStaff.length === 0 && (
+              <div className="text-center py-10 text-muted-foreground text-sm">No results found.</div>
+            )}
           </div>
-        ))}
+        </div>
       </div>
-
-      {/* Staff Detail Dialog */}
-      <Dialog open={!!selectedStaff} onOpenChange={() => setSelectedStaff(null)}>
-        <DialogContent className="glass-card border-glass-border max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">{selectedStaff?.name}</DialogTitle>
-            <DialogDescription>{selectedStaff?.role}</DialogDescription>
-          </DialogHeader>
-          
-          {selectedStaff && (
-            <div className="space-y-6 mt-4">
-              {/* Contact Info */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="glass-card p-4">
-                  <p className="text-sm text-muted-foreground">Email</p>
-                  <p className="font-medium">{selectedStaff.email}</p>
-                </div>
-                <div className="glass-card p-4">
-                  <p className="text-sm text-muted-foreground">Phone</p>
-                  <p className="font-medium">{selectedStaff.phone}</p>
-                </div>
-              </div>
-
-              {/* Stats */}
-              <div className="grid grid-cols-3 gap-4">
-                <div className="glass-card p-4 text-center">
-                  <CreditCard className="h-5 w-5 mx-auto mb-2 text-primary" />
-                  <p className="text-2xl font-bold">{selectedStaff.transactions}</p>
-                  <p className="text-sm text-muted-foreground">Transactions</p>
-                </div>
-                <div className="glass-card p-4 text-center">
-                  <Calendar className="h-5 w-5 mx-auto mb-2 text-success" />
-                  <p className="text-2xl font-bold">{selectedStaff.checkIns}</p>
-                  <p className="text-sm text-muted-foreground">Check-ins</p>
-                </div>
-                <div className="glass-card p-4 text-center">
-                  <Calendar className="h-5 w-5 mx-auto mb-2 text-secondary" />
-                  <p className="text-2xl font-bold">{selectedStaff.checkOuts}</p>
-                  <p className="text-sm text-muted-foreground">Check-outs</p>
-                </div>
-              </div>
-
-              {/* Weekly Performance Chart */}
-              <div className="glass-card p-4">
-                <h4 className="font-semibold mb-4">Weekly Revenue</h4>
-                <div className="h-[200px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={weeklyData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                      <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(v) => `₦${(v / 1000).toFixed(0)}K`} />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "12px",
-                        }}
-                        formatter={(value: number) => [`₦${value.toLocaleString()}`, "Revenue"]}
-                      />
-                      <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <Button variant="hero" className="flex-1">Edit Profile</Button>
-                <Button variant="outline" className="flex-1">View Full Activity</Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

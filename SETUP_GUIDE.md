@@ -295,7 +295,7 @@ $sourceDir = ".\src\components\ui"
 $destDir = ".\nextjs-clone\components\ui"
 
 Get-ChildItem $sourceDir -Filter *.tsx | ForEach-Object {
-    $content = Get-Content $_.FullName -Raw
+    $content = Get-Content $_.fullname -Raw
     $newContent = '"use client";' + "`n`n" + $content
     $newContent | Set-Content (Join-Path $destDir $_.Name)
 }

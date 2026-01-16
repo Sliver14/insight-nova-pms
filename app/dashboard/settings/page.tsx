@@ -49,7 +49,7 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="hotel" className="space-y-6">
-        <TabsList className="glass-card p-1">
+        <TabsList className="grid grid-cols-2 sm:flex sm:flex-wrap h-auto sm:h-10">
           <TabsTrigger value="hotel" className="gap-2">
             <Building2 className="h-4 w-4" />
             Hotel Profile
@@ -74,7 +74,7 @@ export default function Settings() {
 
         {/* Hotel Profile */}
         <TabsContent value="hotel" className="space-y-6">
-          <div className="glass-card p-6 space-y-6">
+          <div className="glass-card p-4 sm:p-6 space-y-6">
             <h3 className="text-lg font-semibold">Hotel Information</h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -135,13 +135,13 @@ export default function Settings() {
 
         {/* Staff & Roles */}
         <TabsContent value="staff" className="space-y-6">
-          <div className="glass-card p-6 space-y-6">
+          <div className="glass-card p-4 sm:p-6 space-y-6">
             <h3 className="text-lg font-semibold">Role Permissions</h3>
             <p className="text-muted-foreground">Manage what each role can access and modify</p>
             
             <div className="space-y-4">
               {["Owner", "Manager", "Receptionist", "Auditor"].map((role) => (
-                <div key={role} className="flex items-center justify-between p-4 rounded-xl border border-border">
+                <div key={role} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-xl border border-border gap-4">
                   <div>
                     <p className="font-semibold">{role}</p>
                     <p className="text-sm text-muted-foreground">
@@ -151,7 +151,7 @@ export default function Settings() {
                       {role === "Auditor" && "View reports and transaction logs"}
                     </p>
                   </div>
-                  <Button variant="outline" size="sm">Edit</Button>
+                  <Button variant="outline" size="sm" className="w-full sm:w-auto">Edit</Button>
                 </div>
               ))}
             </div>
@@ -160,7 +160,7 @@ export default function Settings() {
 
         {/* Payments */}
         <TabsContent value="payments" className="space-y-6">
-          <div className="glass-card p-6 space-y-6">
+          <div className="glass-card p-4 sm:p-6 space-y-6">
             <h3 className="text-lg font-semibold">Payment Methods</h3>
             <p className="text-muted-foreground">Configure accepted payment methods</p>
             
@@ -186,20 +186,20 @@ export default function Settings() {
 
         {/* Security */}
         <TabsContent value="security" className="space-y-6">
-          <div>
-            <div className="glass-card p-6 space-y-6">
+          <div className="space-y-6">
+            <div className="glass-card p-4 sm:p-6 space-y-6">
               <h3 className="text-lg font-semibold">Security Settings</h3>
               <p className="text-muted-foreground">Configure security and access controls</p>
               
               <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 rounded-xl border border-border">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-xl border border-border gap-4">
                   <div>
                     <p className="font-semibold">Two-Factor Authentication</p>
                     <p className="text-sm text-muted-foreground">Add extra security to your account</p>
                   </div>
                   <Switch />
                 </div>
-                <div className="flex items-center justify-between p-4 rounded-xl border border-border">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-xl border border-border gap-4">
                   <div>
                     <p className="font-semibold">Auto Logout</p>
                     <p className="text-sm text-muted-foreground">Automatically log out after 30 minutes of inactivity</p>
@@ -209,17 +209,17 @@ export default function Settings() {
                     onCheckedChange={(checked) => setPreferences({ ...preferences, autoLogout: checked })}
                   />
                 </div>
-                <div className="flex items-center justify-between p-4 rounded-xl border border-border">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-xl border border-border gap-4">
                   <div>
                     <p className="font-semibold">IP Restriction</p>
                     <p className="text-sm text-muted-foreground">Limit access to specific IP addresses</p>
                   </div>
-                  <Button variant="outline" size="sm">Configure</Button>
+                  <Button variant="outline" size="sm" className="w-full sm:w-auto">Configure</Button>
                 </div>
               </div>
             </div>
 
-            <div className="glass-card p-6 space-y-4">
+            <div className="glass-card p-4 sm:p-6 space-y-4">
               <h3 className="text-lg font-semibold">Integrations</h3>
               <p className="text-muted-foreground">Connect with external security systems (Future feature)</p>
               
@@ -234,7 +234,7 @@ export default function Settings() {
 
         {/* Preferences */}
         <TabsContent value="preferences" className="space-y-6">
-          <div className="glass-card p-6 space-y-6">
+          <div className="glass-card p-4 sm:p-6 space-y-6">
             <h3 className="text-lg font-semibold">Display & Notifications</h3>
             
             <div className="space-y-4">

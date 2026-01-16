@@ -1,21 +1,11 @@
 "use client";
 
-import { ReactNode } from "react";
-import { Sidebar } from "./Sidebar";
-import { TopBar } from "./TopBar";
+import { DashboardWrapper } from "./DashboardWrapper";
 
-interface DashboardLayoutProps {
-  children: ReactNode;
-}
-
-export function DashboardLayout({ children }: DashboardLayoutProps) {
+export function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar />
-      <div className="ml-64">
-        <TopBar />
-        <main className="p-6">{children}</main>
-      </div>
-    </div>
+    <DashboardWrapper>
+      {children}
+    </DashboardWrapper>
   );
 }

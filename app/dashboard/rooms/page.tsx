@@ -17,76 +17,58 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Search, Filter, Plus } from "lucide-react";
+import { AddRoomModal } from "@/components/rooms/AddRoomModal";
 
+// Real Room type (matches your Prisma schema)
 interface Room {
-  roomNumber: string;
+  id: string;
+  room_number: string;
   status: RoomStatus;
   guestName?: string;
   floor: number;
   type: string;
-  price: number;
+  rate_per_night: number;
   checkIn?: string;
   checkOut?: string;
 }
-
-const generateRooms = (): Room[] => {
-  const types = ["Standard", "Deluxe", "Suite", "Executive"];
-  const prices = { Standard: 25000, Deluxe: 45000, Suite: 75000, Executive: 120000 };
-  const statuses: RoomStatus[] = ["occupied", "available", "reserved", "cleaning", "maintenance"];
-  const guests = ["John Smith", "Mary Johnson", "Ahmed Ali", "Grace Obi", "David Chen"];
-  
-  const rooms: Room[] = [];
-  for (let floor = 1; floor <= 4; floor++) {
-    for (let room = 1; room <= 6; room++) {
-      const roomNum = floor * 100 + room;
-      const type = types[Math.floor(Math.random() * types.length)];
-      const statusIndex = Math.floor(Math.random() * 100);
-      let status: RoomStatus;
-      if (statusIndex < 50) status = "occupied";
-      else if (statusIndex < 70) status = "available";
-      else if (statusIndex < 85) status = "reserved";
-      else if (statusIndex < 95) status = "cleaning";
-      else status = "maintenance";
-      
-      rooms.push({
-        roomNumber: `${roomNum}`,
-        status,
-        guestName: status === "occupied" ? guests[Math.floor(Math.random() * guests.length)] : undefined,
-        floor,
-        type,
-        price: prices[type as keyof typeof prices],
-        checkIn: status === "occupied" ? "2025-01-20" : undefined,
-        checkOut: status === "occupied" ? "2025-01-25" : undefined,
-      });
-    }
-  }
-  return rooms;
-};
-
-const rooms = generateRooms();
 
 export default function Rooms() {
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [addRoomOpen, setAddRoomOpen] = useState(false);
 
-  const filteredRooms = rooms.filter((room) => {
-    const matchesStatus = statusFilter === "all" || room.status === statusFilter;
-    const matchesSearch = room.roomNumber.includes(searchQuery) || 
-      (room.guestName?.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchesStatus && matchesSearch;
+  const { data: rooms = [], isLoading, refetch } = useQuery<Room[]>({
+    queryKey: ["rooms"],
+    queryFn: async () => {
+      const res = await fetch("/api/rooms");
+      if (!res.ok) throw new Error("Failed to fetch rooms");
+      return res.json();
+    },
   });
 
-  const statusCounts = {
+  const filteredRooms = useMemo(() => 
+    rooms.filter((room) => {
+      const matchesStatus = statusFilter === "all" || room.status === statusFilter;
+      const matchesSearch = 
+        room.room_number?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        (room.guestName || "").toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesStatus && matchesSearch;
+    }),
+    [rooms, statusFilter, searchQuery]
+  );
+
+  const statusCounts = useMemo(() => ({
     all: rooms.length,
     occupied: rooms.filter((r) => r.status === "occupied").length,
     available: rooms.filter((r) => r.status === "available").length,
     reserved: rooms.filter((r) => r.status === "reserved").length,
     cleaning: rooms.filter((r) => r.status === "cleaning").length,
     maintenance: rooms.filter((r) => r.status === "maintenance").length,
-  };
+  }), [rooms]);
 
   return (
     <div className="space-y-8">
@@ -96,7 +78,7 @@ export default function Rooms() {
           <h1 className="text-3xl font-bold">Rooms</h1>
           <p className="text-muted-foreground">Manage all hotel rooms and their status</p>
         </div>
-        <Button variant="hero">
+        <Button variant="hero" onClick={() => setAddRoomOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Add Room
         </Button>
@@ -135,7 +117,7 @@ export default function Rooms() {
           <button
             key={status}
             onClick={() => setStatusFilter(status)}
-            className={`glass-card p-4 text-center transition-all duration-200 ${
+            className={`glass-card p-4 text-center transition-all duration-200 cursor-pointer ${
               statusFilter === status ? "border-primary shadow-glow-primary" : ""
             }`}
           >
@@ -145,37 +127,35 @@ export default function Rooms() {
         ))}
       </div>
 
-      {/* Room Grid by Floor */}
-      {[1, 2, 3, 4].map((floor) => {
-        const floorRooms = filteredRooms.filter((r) => r.floor === floor);
-        if (floorRooms.length === 0) return null;
-        
-        return (
-          <div key={floor} className="glass-card p-6">
-            <h3 className="text-lg font-semibold mb-4">Floor {floor}</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {floorRooms.map((room) => (
-                <RoomCard
-                  key={room.roomNumber}
-                  roomNumber={room.roomNumber}
-                  status={room.status}
-                  guestName={room.guestName}
-                  floor={room.floor}
-                  onClick={() => setSelectedRoom(room)}
-                />
-              ))}
-            </div>
+      {/* Room Grid */}
+      {isLoading ? (
+        <div className="text-center py-12 text-muted-foreground">Loading rooms...</div>
+      ) : filteredRooms.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">No rooms found</div>
+      ) : (
+        <div className="glass-card p-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {filteredRooms.map((room) => (
+              <RoomCard
+                key={room.id || room.room_number} // Use id if available, fallback to room_number
+                roomNumber={room.room_number}
+                status={room.status?.toLowerCase() as RoomStatus}
+                guestName={room.guestName}
+                floor={parseInt(room.room_number?.charAt(0) || "1")}
+                onClick={() => setSelectedRoom(room)}
+              />
+            ))}
           </div>
-        );
-      })}
+        </div>
+      )}
 
       {/* Room Detail Dialog */}
       <Dialog open={!!selectedRoom} onOpenChange={() => setSelectedRoom(null)}>
         <DialogContent className="glass-card border-glass-border">
           <DialogHeader>
-            <DialogTitle className="text-2xl">Room {selectedRoom?.roomNumber}</DialogTitle>
+            <DialogTitle className="text-2xl">Room {selectedRoom?.room_number}</DialogTitle>
             <DialogDescription>
-              {selectedRoom?.type} • Floor {selectedRoom?.floor}
+              {selectedRoom?.type} • ₦{selectedRoom?.rate_per_night?.toLocaleString()}/night
             </DialogDescription>
           </DialogHeader>
           
@@ -188,37 +168,26 @@ export default function Rooms() {
                 </div>
                 <div className="glass-card p-4">
                   <p className="text-sm text-muted-foreground">Rate/Night</p>
-                  <p className="font-semibold">₦{selectedRoom.price.toLocaleString()}</p>
+                  <p className="font-semibold">₦{selectedRoom.rate_per_night?.toLocaleString()}</p>
                 </div>
               </div>
 
-              {selectedRoom.guestName && (
-                <div className="glass-card p-4">
-                  <p className="text-sm text-muted-foreground mb-2">Guest Information</p>
-                  <p className="font-semibold">{selectedRoom.guestName}</p>
-                  <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
-                    <span>Check-in: {selectedRoom.checkIn}</span>
-                    <span>Check-out: {selectedRoom.checkOut}</span>
-                  </div>
-                </div>
-              )}
-
               <div className="flex gap-3">
-                {selectedRoom.status === "occupied" && (
-                  <Button variant="heroSecondary" className="flex-1">Check Out</Button>
-                )}
-                {selectedRoom.status === "available" && (
-                  <Button variant="hero" className="flex-1">Check In Guest</Button>
-                )}
-                {selectedRoom.status === "cleaning" && (
-                  <Button variant="hero" className="flex-1">Mark as Ready</Button>
-                )}
-                <Button variant="outline" className="flex-1">View History</Button>
+                <Button variant="outline" className="flex-1" onClick={() => setSelectedRoom(null)}>
+                  Close
+                </Button>
               </div>
             </div>
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Add Room Modal */}
+      <AddRoomModal 
+        open={addRoomOpen} 
+        onOpenChange={setAddRoomOpen}
+        onSuccess={refetch}
+      />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,52 +15,46 @@ type OnboardingStep = 1 | 2 | 3;
 const hotelTypes = ["Budget", "Mid-Range", "Premium", "Luxury"];
 const paymentMethods = ["Cash", "POS", "Bank Transfer", "Mobile Money"];
 
+
 export default function Auth() {
-  const searchParams = useSearchParams();
-  const initialMode = searchParams.get("mode") === "signup" ? "signup" : "signin";
-  const [mode, setMode] = useState<AuthMode>(initialMode);
-  const [step, setStep] = useState<OnboardingStep>(1);
-  const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
-  // Form states
+// useEffect(() => {
+//     const checkAuth = async () => {
+//       try {
+//         const res = await fetch("/api/auth/session");
+//         const data = await res.json();
+//         if (data.authenticated) {
+//           router.replace("/dashboard"); // Full replace to avoid back button issues
+//         }
+//       } catch (err) {
+//         // Network error → stay on auth page
+//       }
+//     };
+
+//     checkAuth();
+//   }, [router]);
+
+  const [mode, setMode] = useState<AuthMode>("signin");
+  const [step, setStep] = useState<OnboardingStep>(1);
+  const [loading, setLoading] = useState(false);
+
   const [formData, setFormData] = useState({
     email: "",
     password: "",
-    fullName: "",
-    role: "manager",
+    fullname: "",
     hotelName: "",
     location: "",
     roomCount: "",
     hotelType: "Mid-Range",
     currency: "₦",
-    paymentMethods: ["Cash", "POS"],
+    paymentMethods: ["Cash", "POS"] as string[],
     shortStay: false,
   });
 
-  const updateFormData = (key: string, value: any) => {
+  const updateFormData = (key: keyof typeof formData, value: any) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const handleSignIn = async () => {
-    setLoading(true);
-    // Simulate auth
-    await new Promise((r) => setTimeout(r, 1000));
-    setLoading(false);
-    router.push("/dashboard");
-  };
-
-  const handleSignUp = async () => {
-    if (step < 3) {
-      setStep((prev) => (prev + 1) as OnboardingStep);
-      return;
-    }
-    setLoading(true);
-    await new Promise((r) => setTimeout(r, 1500));
-    setLoading(false);
-    toast({ title: "Account created!", description: "Your hotel is ready to manage." });
-    router.push("/dashboard");
   };
 
   const togglePaymentMethod = (method: string) => {
@@ -72,9 +66,161 @@ export default function Auth() {
     }));
   };
 
+  // REAL LOGIN
+  const handleSignIn = async () => {
+    if (!formData.email || !formData.password) {
+      toast({
+        title: "Missing fields",
+        description: "Please enter email and password",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: formData.email.toLowerCase(),
+          password: formData.password,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        toast({
+          title: "Welcome back!",
+          description: "Successfully signed in",
+        });
+        router.push("/dashboard");
+        router.refresh(); // Ensures server components see new session
+      } else {
+        toast({
+          title: "Login failed",
+          description: data.error || "Invalid credentials",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Network error. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // REAL SIGNUP (multi-step → final API call on step 3)
+  const handleNextOrSignup = async () => {
+    if (mode === "signin") return;
+
+    // Step 1: Validate required fields before advancing
+    if (step === 1) {
+      const name = formData.fullname.trim();
+      const email = formData.email.trim();
+      const password = formData.password;
+
+      if (!name || !email || !password) {
+        toast({
+          title: "Missing information",
+          description: "Please provide your full name, email, and password",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Basic password length check (mirrors API)
+      if (password.length < 8) {
+        toast({
+          title: "Weak password",
+          description: "Password must be at least 8 characters long",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    // Step 2: Validate hotel name before going to step 3
+    if (step === 2) {
+      if (!formData.hotelName.trim()) {
+        toast({
+          title: "Hotel name required",
+          description: "Please enter the name of your hotel",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    // Navigate to next step
+    if (step < 3) {
+      setStep((prev) => (prev + 1) as OnboardingStep);
+      return;
+    }
+
+    // Step 3: Final signup
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullname: formData.fullname.trim(),
+          email: formData.email.toLowerCase().trim(),
+          password: formData.password,
+          hotelName: formData.hotelName.trim(),
+          location: formData.location.trim() || undefined,
+          roomCount: formData.roomCount ? parseInt(formData.roomCount, 10) : undefined,
+          hotelType: formData.hotelType || undefined,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        toast({
+          title: "Welcome to InsightNova! 🎉",
+          description: `${formData.fullname.trim()}, your hotel "${formData.hotelName.trim()}" has been created successfully.`,
+        });
+        router.push("/dashboard");
+        router.refresh(); // Ensures session is recognized server-side
+      } else {
+        // Enhanced error messages from API
+        let message = data.error || "Unable to create account";
+
+        if (data.details && typeof data.details === "object") {
+          const errors = Object.values(data.details).flat() as string[];
+          message = errors.join(" • ");
+        }
+
+        toast({
+          title: "Signup failed",
+          description: message,
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      console.error("Signup error:", err);
+      toast({
+        title: "Connection failed",
+        description: "Please check your internet connection and try again",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background flex">
-      {/* Left Panel - Branding */}
+      {/* Left Panel - Branding (unchanged) */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-card to-muted/30 relative overflow-hidden">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-1/3 left-1/3 w-96 h-96 bg-primary/20 rounded-full blur-3xl animate-float" />
@@ -82,15 +228,19 @@ export default function Auth() {
         </div>
         
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
+          <a href="#" aria-label="InsightNova Home">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-glow-primary">
               <span className="text-primary-foreground font-bold text-xl">IN</span>
             </div>
+            
             <div>
               <h1 className="font-bold text-xl">InsightNova</h1>
               <p className="text-sm text-muted-foreground">Property Management System</p>
             </div>
+            
           </div>
+          </a>
 
           <div className="space-y-6">
             <h2 className="text-4xl font-bold leading-tight">
@@ -120,7 +270,7 @@ export default function Auth() {
         </div>
       </div>
 
-      {/* Right Panel - Auth Form */}
+      {/* Right Panel - Forms */}
       <div className="flex-1 flex items-center justify-center p-6 lg:p-12">
         <div className="w-full max-w-md animate-fade-in">
           {/* Mobile Logo */}
@@ -131,8 +281,8 @@ export default function Auth() {
             <span className="font-bold text-xl">InsightNova</span>
           </div>
 
+          {/* SIGN IN */}
           {mode === "signin" ? (
-            /* Sign In Form */
             <div className="space-y-6">
               <div className="text-center lg:text-left">
                 <h2 className="text-3xl font-bold mb-2">Welcome back</h2>
@@ -148,28 +298,19 @@ export default function Auth() {
                     placeholder="you@example.com"
                     value={formData.email}
                     onChange={(e) => updateFormData("email", e.target.value)}
+                    disabled={loading}
                   />
                 </div>
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="password">Password</Label>
-                    <button className="text-sm text-primary hover:underline">
-                      Forgot password?
-                    </button>
-                  </div>
+                  <Label htmlFor="password">Password</Label>
                   <Input
                     id="password"
                     type="password"
                     placeholder="••••••••"
                     value={formData.password}
                     onChange={(e) => updateFormData("password", e.target.value)}
+                    disabled={loading}
                   />
-                </div>
-                <div className="flex items-center gap-2">
-                  <Switch id="remember" />
-                  <Label htmlFor="remember" className="text-sm text-muted-foreground">
-                    Remember me
-                  </Label>
                 </div>
               </div>
 
@@ -187,46 +328,47 @@ export default function Auth() {
                 New here?{" "}
                 <button
                   className="text-primary font-medium hover:underline"
-                  onClick={() => setMode("signup")}
+                  onClick={() => {
+                    setMode("signup");
+                    setStep(1);
+                    setFormData((prev) => ({ ...prev, fullname: "", hotelName: "" }));
+                  }}
+                  disabled={loading}
                 >
                   Create an account
                 </button>
               </p>
             </div>
           ) : (
-            /* Sign Up / Onboarding Form */
+            /* SIGN UP - Multi-step */
             <div className="space-y-6">
-              {/* Progress Indicator */}
               <div className="flex items-center justify-center gap-2 mb-8">
                 {[1, 2, 3].map((s) => (
                   <div
                     key={s}
                     className={`h-2 rounded-full transition-all duration-300 ${
-                      s === step
-                        ? "w-8 bg-primary"
-                        : s < step
-                        ? "w-2 bg-primary/60"
-                        : "w-2 bg-muted"
+                      s === step ? "w-8 bg-primary" : s < step ? "w-2 bg-primary/60" : "w-2 bg-muted"
                     }`}
                   />
                 ))}
               </div>
 
+              {/* Step 1 */}
               {step === 1 && (
                 <div className="space-y-6 animate-slide-up">
                   <div className="text-center lg:text-left">
                     <h2 className="text-3xl font-bold mb-2">Create your account</h2>
                     <p className="text-muted-foreground">Step 1 of 3 — Account details</p>
                   </div>
-
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="fullName">Full Name</Label>
+                      <Label htmlFor="fullname">Full Name</Label>
                       <Input
-                        id="fullName"
+                        id="fullname"
                         placeholder="John Doe"
-                        value={formData.fullName}
-                        onChange={(e) => updateFormData("fullName", e.target.value)}
+                        value={formData.fullname}
+                        onChange={(e) => updateFormData("fullname", e.target.value)}
+                        disabled={loading}
                       />
                     </div>
                     <div className="space-y-2">
@@ -237,6 +379,7 @@ export default function Auth() {
                         placeholder="you@example.com"
                         value={formData.email}
                         onChange={(e) => updateFormData("email", e.target.value)}
+                        disabled={loading}
                       />
                     </div>
                     <div className="space-y-2">
@@ -247,37 +390,20 @@ export default function Auth() {
                         placeholder="••••••••"
                         value={formData.password}
                         onChange={(e) => updateFormData("password", e.target.value)}
+                        disabled={loading}
                       />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Role</Label>
-                      <div className="flex gap-3">
-                        {["owner", "manager"].map((role) => (
-                          <button
-                            key={role}
-                            onClick={() => updateFormData("role", role)}
-                            className={`flex-1 py-3 px-4 rounded-xl border transition-all duration-200 capitalize ${
-                              formData.role === role
-                                ? "border-primary bg-primary/10 text-primary"
-                                : "border-border hover:border-primary/50"
-                            }`}
-                          >
-                            {role}
-                          </button>
-                        ))}
-                      </div>
                     </div>
                   </div>
                 </div>
               )}
 
+              {/* Step 2 & 3 unchanged visually — just inputs */}
               {step === 2 && (
                 <div className="space-y-6 animate-slide-up">
                   <div className="text-center lg:text-left">
                     <h2 className="text-3xl font-bold mb-2">Hotel Details</h2>
                     <p className="text-muted-foreground">Step 2 of 3 — Tell us about your hotel</p>
                   </div>
-
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="hotelName">Hotel Name</Label>
@@ -286,6 +412,7 @@ export default function Auth() {
                         placeholder="Grand Palace Hotel"
                         value={formData.hotelName}
                         onChange={(e) => updateFormData("hotelName", e.target.value)}
+                        disabled={loading}
                       />
                     </div>
                     <div className="space-y-2">
@@ -295,6 +422,7 @@ export default function Auth() {
                         placeholder="Lagos, Nigeria"
                         value={formData.location}
                         onChange={(e) => updateFormData("location", e.target.value)}
+                        disabled={loading}
                       />
                     </div>
                     <div className="space-y-2">
@@ -305,6 +433,7 @@ export default function Auth() {
                         placeholder="50"
                         value={formData.roomCount}
                         onChange={(e) => updateFormData("roomCount", e.target.value)}
+                        disabled={loading}
                       />
                     </div>
                     <div className="space-y-2">
@@ -314,6 +443,7 @@ export default function Auth() {
                           <button
                             key={type}
                             onClick={() => updateFormData("hotelType", type)}
+                            disabled={loading}
                             className={`py-3 px-4 rounded-xl border transition-all duration-200 ${
                               formData.hotelType === type
                                 ? "border-primary bg-primary/10 text-primary"
@@ -333,9 +463,8 @@ export default function Auth() {
                 <div className="space-y-6 animate-slide-up">
                   <div className="text-center lg:text-left">
                     <h2 className="text-3xl font-bold mb-2">Setup Preferences</h2>
-                    <p className="text-muted-foreground">Step 3 of 3 — Configure your settings</p>
+                    <p className="text-muted-foreground">Step 3 of 3 — Finalize your settings</p>
                   </div>
-
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <Label>Currency</Label>
@@ -344,6 +473,7 @@ export default function Auth() {
                           <button
                             key={currency}
                             onClick={() => updateFormData("currency", currency)}
+                            disabled={loading}
                             className={`flex-1 py-3 px-4 rounded-xl border transition-all duration-200 text-lg font-semibold ${
                               formData.currency === currency
                                 ? "border-primary bg-primary/10 text-primary"
@@ -362,6 +492,7 @@ export default function Auth() {
                           <button
                             key={method}
                             onClick={() => togglePaymentMethod(method)}
+                            disabled={loading}
                             className={`py-3 px-4 rounded-xl border transition-all duration-200 ${
                               formData.paymentMethods.includes(method)
                                 ? "border-primary bg-primary/10 text-primary"
@@ -381,12 +512,14 @@ export default function Auth() {
                       <Switch
                         checked={formData.shortStay}
                         onCheckedChange={(checked) => updateFormData("shortStay", checked)}
+                        disabled={loading}
                       />
                     </div>
                   </div>
                 </div>
               )}
 
+              {/* Navigation Buttons */}
               <div className="flex gap-3">
                 {step > 1 && (
                   <Button
@@ -394,6 +527,7 @@ export default function Auth() {
                     size="lg"
                     className="flex-1"
                     onClick={() => setStep((prev) => (prev - 1) as OnboardingStep)}
+                    disabled={loading}
                   >
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Back
@@ -403,7 +537,7 @@ export default function Auth() {
                   variant="hero"
                   size="lg"
                   className="flex-1"
-                  onClick={handleSignUp}
+                  onClick={handleNextOrSignup}
                   disabled={loading}
                 >
                   {loading ? (
@@ -430,6 +564,7 @@ export default function Auth() {
                     setMode("signin");
                     setStep(1);
                   }}
+                  disabled={loading}
                 >
                   Sign in
                 </button>

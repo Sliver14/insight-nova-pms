@@ -1,225 +1,226 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL") // Crucial for migrations on serverless
+}
 
 generator client {
   provider = "prisma-client-js"
 }
 
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-model Tenant {
-  id        String   @id @default(uuid())
-  name      String
-  hotelCode String   @unique
-  address   String?
-  timezone  String   @default("Africa/Lagos")
-  status    TenantStatus @default(TRIAL)
-
-  users         User[]
-  roles         Role[]
-  subscriptions Subscription[]
-  authEvents    AuthEvent[]
-
-  createdAt DateTime @default(now())
-}
-
-enum TenantStatus {
-  TRIAL
-  ACTIVE
-  SUSPENDED
-}
-
-model User {
-  id           String   @id @default(uuid())
-  tenantId     String
-  tenant       Tenant   @relation(fields: [tenantId], references: [id])
-
-  fullName     String
-  email        String?
-  phone        String?
-  passwordHash String?
-  staffCode    String   @unique
-  status       UserStatus @default(ACTIVE)
-  isOwner      Boolean  @default(false)
-
-  roles        UserRole[]
-  authMethods  AuthMethod[]
-  sessions     Session[]
-  authEvents   AuthEvent[]
-
-  createdAt DateTime @default(now())
-}
-
-enum UserStatus {
-  ACTIVE
-  SUSPENDED
-  TERMINATED
-}
-
-model User {
-  id           String   @id @default(uuid())
-  tenantId     String
-  tenant       Tenant   @relation(fields: [tenantId], references: [id])
-
-  fullName     String
-  email        String?
-  phone        String?
-  passwordHash String?
-  staffCode    String   @unique
-  status       UserStatus @default(ACTIVE)
-  isOwner      Boolean  @default(false)
-
-  roles        UserRole[]
-  authMethods  AuthMethod[]
-  sessions     Session[]
-  authEvents   AuthEvent[]
-
-  createdAt DateTime @default(now())
-}
-
-enum UserStatus {
-  ACTIVE
-  SUSPENDED
-  TERMINATED
-}
-
-model Role {
-  id        String @id @default(uuid())
-  tenantId  String
-  tenant    Tenant @relation(fields: [tenantId], references: [id])
-
-  name      String
-  isSystem  Boolean @default(false)
-
-  users        UserRole[]
-  permissions  RolePermission[]
-
-  createdAt DateTime @default(now())
-
-  @@unique([tenantId, name])
-}
-
-model RolePermission {
-  roleId       String
-  permissionId String
-
-  role        Role       @relation(fields: [roleId], references: [id])
-  permission  Permission @relation(fields: [permissionId], references: [id])
-
-  @@id([roleId, permissionId])
-}
-
-model UserRole {
-  userId String
-  roleId String
-
-  user User @relation(fields: [userId], references: [id])
-  role Role @relation(fields: [roleId], references: [id])
-
-  assignedAt DateTime @default(now())
-
-  @@id([userId, roleId])
-}
-
-model AuthMethod {
-  id          String @id @default(uuid())
-  userId      String
-  user        User   @relation(fields: [userId], references: [id])
-
-  type        AuthMethodType
-  provider    String?
-  externalRef String?
-  isPrimary   Boolean @default(false)
-
-  createdAt DateTime @default(now())
-}
-
-enum AuthMethodType {
-  PASSWORD
-  PIN
-  BIOMETRIC
-  SMART_LOCK
-  MOBILE_KEY
-}
-
+// Required for Lucia's PrismaAdapter
 model Session {
-  id         String @id @default(uuid())
-  userId     String
-  tenantId   String
+  id        String   @id @default(cuid()) // cuid() is recommended by Lucia for better performance; fallback to uuid() if preferred
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
 
-  user       User   @relation(fields: [userId], references: [id])
-  tenant     Tenant @relation(fields: [tenantId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  deviceId   String?
-  authMethod AuthMethodType
-  issuedAt   DateTime @default(now())
-  expiresAt  DateTime
+  @@index([userId])
+  @@map("session")
 }
 
-model AuthEvent {
-  id        String @id @default(uuid())
-  tenantId  String
-  userId    String?
+model User {
+  id            String    @id @default(uuid())
+  fullname      String    @unique
+  email         String?   @unique
+  password_hash String?   // We'll store hashed passwords here
+  role          Role      @default(staff)
+  hotel_id      String?
+  hotel         Hotel?    @relation("HotelUsers", fields: [hotel_id], references: [id])
+  staff_profile Staff?
+  is_approved   Boolean   @default(false)
+  last_login_at DateTime?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-  user   User?   @relation(fields: [userId], references: [id])
-
-  method   AuthEventMethod
-  source   AuthEventSource
-  roomId   String?
-  metadata Json?
-
-  occurredAt DateTime @default(now())
+  // Relations
+  owned_hotels         Hotel[]       @relation("HotelOwner")
+  folios               Folio[]
+  transactions         Transaction[]
+  approvedTransactions Transaction[] @relation("approvedBy")
+  sessions             Session[]     // Added for Lucia session management
 }
 
-enum AuthEventMethod {
-  LOGIN
-  LOCK_ENTRY
-  BIOMETRIC
-  POS_SALE
-  VOID
-  OVERRIDE
+model Hotel {
+  id                   String  @id @default(uuid())
+  name                 String
+  address              String?
+  room_count           Int
+  subscription_tier    SubscriptionTier?
+  subscription_status  SubscriptionStatus? @default(trial)
+  subscription_start   DateTime?
+  subscription_end     DateTime?
+  owner_id             String? @unique
+  owner                User?   @relation("HotelOwner", fields: [owner_id], references: [id])
+
+  rooms   Room[]
+  staff   Staff[]
+  users   User[]  @relation("HotelUsers")
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 }
 
-enum AuthEventSource {
-  WEB
-  POS
-  LOCK
-  CCTV
-  MOBILE
+model Staff {
+  id        String   @id @default(uuid())
+  user_id   String?  @unique
+  user      User?    @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  hotel_id  String
+  hotel     Hotel    @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
+  fullname  String
+  email     String   @unique
+  phone     String?
+  role      Role
+  status    StaffStatus @default(ACTIVE)
+  hire_date DateTime
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 }
 
-model Subscription {
-  id        String @id @default(uuid())
-  tenantId  String
-  tenant    Tenant @relation(fields: [tenantId], references: [id])
+////////////////////
+// ROOMS & BOOKINGS
+////////////////////
+model Room {
+  id               String    @id @default(uuid())
+  hotel_id         String
+  hotel            Hotel     @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
+  room_number      String
+  type             RoomType?
+  status           RoomStatus?
+  rate_per_hour    Float?
+  rate_per_night   Float?
+  last_occupied_at DateTime?
+  bookings         Booking[]
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
 
-  plan      SubscriptionPlan
-  amount    Int
-  status    SubscriptionStatus
-
-  startedAt DateTime
-  expiresAt DateTime
-
-  createdAt DateTime @default(now())
+  @@unique([hotel_id, room_number])
 }
 
-enum SubscriptionPlan {
-  STANDALONE
-  ADDON
+model Booking {
+  id          String        @id @default(uuid())
+  room_id     String
+  room        Room          @relation(fields: [room_id], references: [id], onDelete: Cascade)
+  hotel_id    String
+  guest_name  String
+  guest_email String
+  check_in    DateTime
+  check_out   DateTime
+  total_price Float
+  status      BookingStatus
+  created_at  DateTime      @default(now())
+  updated_at  DateTime      @updatedAt
+}
+
+////////////////////
+// FOLIOS & TRANSACTIONS
+////////////////////
+model Folio {
+  id              String        @id @default(uuid())
+  hotel_id        String
+  room_id         String
+  guest_name      String?
+  guest_phone     String?
+  check_in        DateTime?
+  check_out       DateTime?
+  duration_minutes Int?
+  total_amount    Float?
+  payment_status  PaymentStatus?
+  ota_source      String?
+  staff_id        String
+  staff           User          @relation(fields: [staff_id], references: [id])
+  transactions    Transaction[]
+  created_at      DateTime      @default(now())
+  updated_at      DateTime      @updatedAt
+}
+
+model Transaction {
+  id                String   @id @default(uuid())
+  folio_id          String
+  folio             Folio    @relation(fields: [folio_id], references: [id], onDelete: Cascade)
+  amount            Float
+  type              TransactionType
+  status            TransactionStatus
+  staff_id          String
+  staff             User     @relation(fields: [staff_id], references: [id])
+  approval_required Boolean?
+  approved_by_id    String?
+  approved_by       User?    @relation("approvedBy", fields: [approved_by_id], references: [id])
+  transaction_ref   String?
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+}
+
+////////////////////
+// ENUMS
+////////////////////
+enum Role {
+  staff
+  manager
+  owner
+  admin
+  super_admin
+  frontdesk
+  cleaner
+}
+
+enum StaffStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum SubscriptionTier {
+  standalone
+  add_on
 }
 
 enum SubscriptionStatus {
-  TRIAL
-  ACTIVE
-  PAST_DUE
-  CANCELLED
+  active
+  trial
+  expired
 }
 
+enum RoomType {
+  standard
+  deluxe
+  suite
+  SINGLE
+  DOUBLE
+  SUITE
+}
 
+enum RoomStatus {
+  available
+  occupied
+  cleaning
+  maintenance
+  AVAILABLE
+  OCCUPIED
+  MAINTENANCE
+}
+
+enum PaymentStatus {
+  paid
+  partial
+  unpaid
+}
+
+enum TransactionType {
+  cash
+  opay
+  palmpay
+  bank
+}
+
+enum TransactionStatus {
+  success
+  pending
+  failed
+  voided
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}

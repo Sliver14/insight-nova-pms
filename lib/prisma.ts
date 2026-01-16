@@ -1,0 +1,20 @@
+// lib/prisma.ts
+import { PrismaClient } from "@prisma/client";
+
+declare global {
+  var prisma: PrismaClient | undefined;
+}
+
+// Reuse client in dev (hot reloads) and create once in prod
+export const prisma =
+  global.prisma ||
+  new PrismaClient({
+    log:
+      process.env.NODE_ENV === "development"
+        ? ["query", "error", "warn"]
+        : ["error"],
+  });
+
+if (process.env.NODE_ENV !== "production") {
+  global.prisma = prisma;
+}

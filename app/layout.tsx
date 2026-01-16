@@ -16,15 +16,16 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="light">
       <body className={inter.className}>
-        <QueryProvider>
-          <TooltipProvider>
-            {children}
-            <Toaster />
-            <Sonner />
-          </TooltipProvider>
-        </QueryProvider>
+          <QueryProvider>
+            <TooltipProvider>
+              {children}
+              <Toaster />
+              <Sonner />
+            </TooltipProvider>
+          </QueryProvider>
+        
       </body>
     </html>
   );

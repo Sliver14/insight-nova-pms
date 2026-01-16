@@ -70,7 +70,7 @@ All tables include audit and sync fields to support **full traceability and conf
 RBAC-enabled users (staff, managers, owners, admins)
 
 - `id` UUID PRIMARY KEY  
-- `username` VARCHAR(50) UNIQUE NOT NULL  
+- `fullname` VARCHAR(50) UNIQUE NOT NULL  
 - `email` VARCHAR(100) UNIQUE  
 - `password_hash` VARCHAR(255) NOT NULL  
 - `role` ENUM('manager','staff','owner','admin') NOT NULL  

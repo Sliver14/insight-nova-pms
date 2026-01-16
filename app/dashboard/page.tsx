@@ -1,9 +1,10 @@
 "use client";
 
+import { useMemo } from "react";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { RoomCard, RoomStatus } from "@/components/dashboard/RoomCard";
 import { StaffCard } from "@/components/dashboard/StaffCard";
-import { TrendingUp, BedDouble, AlertTriangle, Users } from "lucide-react";
+import { TrendingUp, BedDouble, Users, Calendar } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -18,6 +19,14 @@ import {
   Pie,
   Cell,
 } from "recharts";
+
+// Hardcoded mock data (replaces API calls)
+const mockMetrics = {
+  totalRooms: 24,
+  occupancyRate: 78,
+  activeBookings: 19,
+  upcomingCheckIns: 5,
+};
 
 const revenueData = [
   { name: "Mon", revenue: 4200000 },
@@ -44,10 +53,18 @@ const pieData = [
   { name: "Security", value: 15, color: "hsl(280, 70%, 50%)" },
 ];
 
-// Generate sample rooms
+const staffMembers = [
+  { id: "1", name: "Adamu Bello", role: "Front Desk Manager", revenue: 2800000, performance: "excellent" as const },
+  { id: "2", name: "Chioma Eze", role: "Senior Receptionist", revenue: 2400000, performance: "excellent" as const },
+  { id: "3", name: "Emeka Okonkwo", role: "Night Auditor", revenue: 2100000, performance: "good" as const },
+  { id: "4", name: "Fatima Abdullahi", role: "Receptionist", revenue: 1800000, performance: "good" as const },
+  { id: "5", name: "Ibrahim Musa", role: "Reservations Agent", revenue: 1500000, performance: "average" as const },
+];
+
+// Generate mock rooms (same logic as before)
 const generateRooms = () => {
   const statuses: RoomStatus[] = ["occupied", "available", "reserved", "cleaning", "maintenance"];
-  const rooms = [];
+  const rooms: any[] = [];
   for (let floor = 1; floor <= 3; floor++) {
     for (let room = 1; room <= 8; room++) {
       const roomNum = floor * 100 + room;
@@ -58,7 +75,7 @@ const generateRooms = () => {
       else if (statusIndex < 85) status = "reserved";
       else if (statusIndex < 95) status = "cleaning";
       else status = "maintenance";
-      
+
       rooms.push({
         roomNumber: `${roomNum}`,
         status,
@@ -70,17 +87,9 @@ const generateRooms = () => {
   return rooms;
 };
 
-const rooms = generateRooms();
-
-const staffMembers = [
-  { id: "1", name: "Adamu Bello", role: "Front Desk Manager", revenue: 2800000, performance: "excellent" as const },
-  { id: "2", name: "Chioma Eze", role: "Senior Receptionist", revenue: 2400000, performance: "excellent" as const },
-  { id: "3", name: "Emeka Okonkwo", role: "Night Auditor", revenue: 2100000, performance: "good" as const },
-  { id: "4", name: "Fatima Abdullahi", role: "Receptionist", revenue: 1800000, performance: "good" as const },
-  { id: "5", name: "Ibrahim Musa", role: "Reservations Agent", revenue: 1500000, performance: "average" as const },
-];
-
 export default function Dashboard() {
+  const rooms = useMemo(() => generateRooms(), []);
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -94,29 +103,27 @@ export default function Dashboard() {
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <MetricCard
-          title="Revenue Growth"
-          value="+23.5%"
-          change={{ value: 12.3, type: "increase" }}
-          icon={<TrendingUp className="h-6 w-6" />}
+          title="Total Rooms"
+          value={mockMetrics.totalRooms.toString()}
+          icon={<BedDouble className="h-6 w-6" />}
           variant="primary"
         />
         <MetricCard
           title="Occupancy Rate"
-          value="78%"
-          change={{ value: 5.2, type: "increase" }}
-          icon={<BedDouble className="h-6 w-6" />}
+          value={`${mockMetrics.occupancyRate}%`}
+          icon={<TrendingUp className="h-6 w-6" />}
           variant="default"
         />
         <MetricCard
-          title="Rooms Occupied"
-          value="19/24"
+          title="Active Bookings"
+          value={mockMetrics.activeBookings.toString()}
           icon={<Users className="h-6 w-6" />}
           variant="default"
         />
         <MetricCard
-          title="Anomalies"
-          value="3"
-          icon={<AlertTriangle className="h-6 w-6" />}
+          title="Upcoming Check-ins"
+          value={mockMetrics.upcomingCheckIns.toString()}
+          icon={<Calendar className="h-6 w-6" />}
           variant="warning"
         />
       </div>
@@ -227,7 +234,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Staff Performance */}
+        {/* Top Staff */}
         <div className="glass-card p-6">
           <h3 className="text-lg font-semibold mb-6">Top Staff by Revenue</h3>
           <div className="space-y-3">
@@ -238,7 +245,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Staff Performance Bar Chart */}
+      {/* Staff Revenue Bar Chart */}
       <div className="glass-card p-6">
         <h3 className="text-lg font-semibold mb-6">Staff Revenue Contribution</h3>
         <div className="h-[300px]">
