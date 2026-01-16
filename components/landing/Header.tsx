@@ -51,7 +51,7 @@ export const Header = () => {
             <Button variant="ghost" asChild>
               <a href="/auth">Login</a>
             </Button>
-            <Button variant="accent" asChild>
+            <Button variant="default" asChild>
               <a href="/auth">Start Free Trial</a>
             </Button>
           </div>
@@ -92,7 +92,7 @@ export const Header = () => {
                 <Button variant="outline" asChild>
                   <a href="/auth">Login</a>
                 </Button>
-                <Button variant="accent" asChild>
+                <Button variant="default" asChild>
                   <a href="/auth">Start Free Trial</a>
                 </Button>
               </div>

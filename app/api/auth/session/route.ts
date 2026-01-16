@@ -18,7 +18,7 @@ export async function GET() {
   }
 
   // Fetch hotel details (only name for now)
-  let hotelName = null;
+  let hotelName: string | null = null;
   if (user.hotelId) {
     const hotel = await prisma.hotel.findUnique({
       where: { id: user.hotelId },
@@ -36,7 +36,7 @@ export async function GET() {
       role: user.role,
       hotelId: user.hotelId || null,
       hotelName,                      // ← Now correctly fetched
-      isApproved: user.is_approved,
+      isApproved: user.isApproved,
     },
   });
 }

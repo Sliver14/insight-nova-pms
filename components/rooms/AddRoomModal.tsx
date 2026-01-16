@@ -15,23 +15,12 @@ interface AddRoomModalProps {
   onSuccess?: () => void;
 }
 
+const today = format(new Date(), "yyyy-MM-dd");
+const tomorrow = format(addDays(new Date(), 1), "yyyy-MM-dd");
+
 export function AddRoomModal({ open, onOpenChange, onSuccess }: AddRoomModalProps) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-
-useEffect(() => {
-  if (!open) return;
-
-  const today = format(new Date(), "yyyy-MM-dd");
-  const tomorrow = format(addDays(new Date(), 1), "yyyy-MM-dd");
-
-  setFormData((prev) => ({
-    ...prev,
-    checkInDate: today,
-    checkOutDate: tomorrow,
-  }));
-}, [open]);
-
 
   const [formData, setFormData] = useState({
     roomNumbers: "",
@@ -42,15 +31,10 @@ useEffect(() => {
     checkOutDate: tomorrow,
   });
 
-  // Auto-update check-out when check-in changes (only if check-out hasn't been manually changed)
+  // Auto-update check-out when check-in changes
   useEffect(() => {
-    const newCheckOut = format(addDays(new Date(formData.checkInDate), 1), "yyyy-MM-dd");
-
-    // Only auto-update if current check-out is the default or matches the previous expected value
-    if (
-      formData.checkOutDate === tomorrow ||
-      formData.checkOutDate === format(addDays(new Date(), 1), "yyyy-MM-dd")
-    ) {
+    if (formData.checkInDate) {
+      const newCheckOut = format(addDays(new Date(formData.checkInDate), 1), "yyyy-MM-dd");
       setFormData((prev) => ({ ...prev, checkOutDate: newCheckOut }));
     }
   }, [formData.checkInDate]);
