@@ -1,4 +1,5 @@
 // app/api/hotels/[id]/route.ts
+export const runtime = "nodejs";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
