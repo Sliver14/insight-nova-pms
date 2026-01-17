@@ -1,5 +1,7 @@
 // app/api/auth/staff-signup/route.ts
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { lucia } from "@/lib/lucia-node";
 import { prisma } from "@/lib/prisma";
 import { hash } from "argon2";

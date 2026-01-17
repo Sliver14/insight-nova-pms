@@ -1,5 +1,6 @@
 // app/api/auth/logout/route.ts
 export const runtime = "nodejs"; // 🔑 REQUIRED for lucia
+export const dynamic = "force-dynamic";
 
 import { lucia } from "@/lib/lucia-node";
 import { cookies } from "next/headers";

@@ -1,5 +1,7 @@
 // app/api/auth/signup/route.ts
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { lucia } from "@/lib/lucia-node"; // ← Use the full version with Prisma
 import { prisma } from "@/lib/prisma"; // Make sure you have this (prisma client instance)
 import { hash } from "argon2"; // Using argon2 for secure password hashing

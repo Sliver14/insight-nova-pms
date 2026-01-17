@@ -1,5 +1,6 @@
 // app/api/auth/login/route.ts
 export const runtime = "nodejs"; // 🔑 REQUIRED for argon2
+export const dynamic = "force-dynamic";
 
 import { lucia } from "@/lib/lucia-node";
 import { prisma } from "@/lib/prisma";
